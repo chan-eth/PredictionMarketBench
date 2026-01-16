@@ -53,41 +53,65 @@ class KalshiOct2025FeeModel(FeeModel):
     Kalshi fee model as of October 1, 2025.
     
     From Kalshi's published fee schedule:
-    - Taker fee: 2% of potential payout, calculated as min(price, 100-price) * 0.02
-    - Maker fee: 0.7% of potential payout (same calculation)
-    - No settlement fee
-    - Fees are rounded up to nearest cent
     
-    Potential payout = min(price, 100-price) per contract
-    This represents the maximum profit possible from the trade.
+    Trading fees are charged as a variable percentage fee of the expected earnings 
+    on an individual contract, which is calculated by multiplying the maximum 
+    potential earnings from the contract by the implied probability of making 
+    those earnings, or the price of the contract divided by $1.
+    
+    Taker Fees:
+        fee = round_up(0.07 × C × P × (1-P))
+        
+    Maker Fees:
+        fee = round_up(0.0175 × C × P × (1-P))
+        
+    Where:
+        P = the price of a contract in dollars (50 cents = 0.50)
+        C = the number of contracts being traded
+        round_up = rounds to the next cent
+    
+    The P × (1-P) formula means fees are highest at P=0.50 (50%) and decrease
+    toward the extremes (P=0 or P=1).
     """
     
-    TAKER_FEE_RATE = 0.02  # 2%
-    MAKER_FEE_RATE = 0.007  # 0.7%
-    
-    def _calculate_potential_payout(self, price_cents: int) -> int:
-        """Calculate potential payout per contract."""
-        return min(price_cents, 100 - price_cents)
+    TAKER_FEE_RATE = 0.07   # 7%
+    MAKER_FEE_RATE = 0.0175  # 1.75%
     
     def calculate_taker_fee(self, price_cents: int, count: int) -> int:
         """
         Calculate taker fee.
         
-        Fee = ceil(potential_payout * count * 0.02)
+        Fee = ceil(0.07 × C × P × (1-P))
+        Where P is price in dollars (e.g., 50 cents = 0.50)
+        
+        Example: Buy 10 contracts at 50c
+            P = 0.50
+            fee = ceil(0.07 × 10 × 0.50 × 0.50) = ceil(0.175) = 1 cent
         """
-        potential_payout = self._calculate_potential_payout(price_cents)
-        fee_float = potential_payout * count * self.TAKER_FEE_RATE
-        return math.ceil(fee_float)
+        p = price_cents / 100.0  # Convert cents to dollars
+        fee_float = self.TAKER_FEE_RATE * count * p * (1 - p)
+        # Fee is already in dollars, convert to cents
+        fee_cents = fee_float * 100
+        return math.ceil(fee_cents)
     
     def calculate_maker_fee(self, price_cents: int, count: int) -> int:
         """
         Calculate maker fee.
         
-        Fee = ceil(potential_payout * count * 0.007)
+        Fee = ceil(0.0175 × C × P × (1-P))
+        Where P is price in dollars (e.g., 50 cents = 0.50)
+        
+        This is 1/4 of the taker fee, encouraging liquidity provision.
+        
+        Example: Provide 10 contracts at 50c
+            P = 0.50  
+            fee = ceil(0.0175 × 10 × 0.50 × 0.50) = ceil(0.04375) = 1 cent
         """
-        potential_payout = self._calculate_potential_payout(price_cents)
-        fee_float = potential_payout * count * self.MAKER_FEE_RATE
-        return math.ceil(fee_float)
+        p = price_cents / 100.0  # Convert cents to dollars
+        fee_float = self.MAKER_FEE_RATE * count * p * (1 - p)
+        # Fee is already in dollars, convert to cents
+        fee_cents = fee_float * 100
+        return math.ceil(fee_cents)
     
     @property
     def version(self) -> str:

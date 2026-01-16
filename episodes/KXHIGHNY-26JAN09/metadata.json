@@ -1,0 +1,20 @@
+{
+  "episode_id": "KXHIGHNY-26JAN09",
+  "event_slug": "KXHIGHNY-26JAN09",
+  "tickers": [
+    "KXHIGHNY-26JAN09-B49.5",
+    "KXHIGHNY-26JAN09-B51.5",
+    "KXHIGHNY-26JAN09-B53.5",
+    "KXHIGHNY-26JAN09-B55.5",
+    "KXHIGHNY-26JAN09-T49",
+    "KXHIGHNY-26JAN09-T56"
+  ],
+  "start_ts": "2026-01-09T01:39:42.185704+00:00",
+  "end_ts": "2026-01-10T04:59:00+00:00",
+  "initial_bankroll_cents": 100000,
+  "fee_model_version": "kalshi_oct_2025",
+  "execution_mode": "maker_taker",
+  "observation_depth": -1,
+  "has_trades_tape": true,
+  "description": "Episode for KXHIGHNY-26JAN09"
+}

@@ -1,0 +1,16 @@
+{
+  "episode_id": "KXNFLGAME-26JAN11BUFJAC",
+  "event_slug": "KXNFLGAME-26JAN11BUFJAC",
+  "tickers": [
+    "KXNFLGAME-26JAN11BUFJAC-BUF",
+    "KXNFLGAME-26JAN11BUFJAC-JAC"
+  ],
+  "start_ts": "2026-01-09T01:42:09.130472+00:00",
+  "end_ts": "2026-01-11T21:08:29.356126+00:00",
+  "initial_bankroll_cents": 100000,
+  "fee_model_version": "kalshi_oct_2025",
+  "execution_mode": "maker_taker",
+  "observation_depth": -1,
+  "has_trades_tape": true,
+  "description": "Episode for KXNFLGAME-26JAN11BUFJAC"
+}

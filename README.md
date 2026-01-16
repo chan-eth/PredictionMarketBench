@@ -135,18 +135,78 @@ cash = ctx.get_cash()
 
 ### Order Types
 
-**v0 (taker-only mode):** Only orders that execute immediately are allowed.
+The benchmark supports two execution modes:
 
-- `OrderType.MARKET`: Always executes as taker
-- `OrderType.LIMIT`: Must be "crossing" (price >= ask for buys, price <= bid for sells)
+**Taker-Only Mode** (`execution_mode: "taker_only"`):
+Only orders that execute immediately against resting liquidity are allowed.
+
+**Maker-Taker Mode** (`execution_mode: "maker_taker"`):
+Orders can rest in the book and get filled when real trades match your price.
+
+#### Order Types
+
+- `OrderType.MARKET`: Always executes as taker (IOC)
+- `OrderType.LIMIT`: With `time_in_force`:
+  - `TimeInForce.IOC`: Fill immediately or cancel (taker only)
+  - `TimeInForce.GTC`: Fill what crosses, rest the remainder (maker eligible)
+  - `TimeInForce.POST_ONLY`: Reject if would cross, always rest (maker only)
 
 ```python
-# Market order
-Order(ticker="X", side=Side.YES, action=Action.BUY, order_type=OrderType.MARKET, count=10)
+from oddpool_bench import Order, Side, Action, OrderType, TimeInForce
 
-# Limit order (must cross to fill in taker-only mode)
-Order(ticker="X", side=Side.YES, action=Action.BUY, order_type=OrderType.LIMIT, 
-      count=10, limit_price_cents=50)
+# Market order - immediate taker fill
+Order(ticker="X", side=Side.YES, action=Action.BUY, 
+      order_type=OrderType.MARKET, count=10)
+
+# Limit IOC - taker only, remainder canceled
+Order(ticker="X", side=Side.YES, action=Action.BUY, 
+      order_type=OrderType.LIMIT, count=10, limit_price_cents=50,
+      time_in_force=TimeInForce.IOC)
+
+# Limit GTC - fill what you can, rest the remainder
+Order(ticker="X", side=Side.YES, action=Action.BUY, 
+      order_type=OrderType.LIMIT, count=10, limit_price_cents=48,
+      time_in_force=TimeInForce.GTC)
+
+# Post-only - reject if would cross, always rest
+Order(ticker="X", side=Side.YES, action=Action.BUY, 
+      order_type=OrderType.LIMIT, count=10, limit_price_cents=45,
+      time_in_force=TimeInForce.POST_ONLY)
+```
+
+#### place_order() Return Value
+
+```python
+result = ctx.place_order(order)
+# {
+#   "rejected": False,
+#   "rejection_reason": None,
+#   "fill": {
+#     "count": 5,
+#     "avg_price_cents": 50,
+#     "total_cost_cents": 252,  # includes fees
+#     "fee_cents": 2
+#   },
+#   "resting": {
+#     "order_id": "abc123",
+#     "ticker": "X",
+#     "side": "yes",
+#     "action": "buy",
+#     "price_cents": 48,
+#     "remaining_count": 5
+#   }
+# }
+```
+
+#### Managing Resting Orders
+
+```python
+# Get all resting orders
+resting = ctx.get_resting_orders()
+# {"order_id": RestingOrder, ...}
+
+# Cancel a specific order
+ctx.cancel_order(order_id)
 ```
 
 ## Episode Data Format
@@ -262,30 +322,56 @@ Requires matplotlib: `pip install matplotlib`
 result.save_equity_curve("equity.png", figsize=(12, 8), show_episodes=True)
 ```
 
-## Execution Model
+## Execution Modes
 
-### Orderbook Convention (Kalshi)
+### Taker-Only Mode
+The simplest mode—all orders execute immediately against the displayed orderbook.
+- Orders that don't cross are rejected
+- Good for quick strategy iteration
 
-Kalshi returns only bids for both YES and NO sides. Asks are derived:
-- `yes_asks = flip(no_bids)` where `yes_ask_price = 100 - no_bid_price`
-- `no_asks = flip(yes_bids)` where `no_ask_price = 100 - yes_bid_price`
+### Maker-Taker Mode  
+More realistic—orders can rest in the book and get filled over time.
 
-### Fill Mechanics
+**Queue Position Simulation:**
+When you place a resting order, we estimate your queue position based on:
+1. **Displayed size** at your price level when you join
+2. **Trade volume** at your price - we assume you get filled proportionally
 
-1. Build executable book (asks for buys, bids for sells)
-2. Walk price levels, filling until order complete or liquidity exhausted
-3. Partial fills allowed; remainder canceled
+If historical trades occur at your price, you receive fills pro-rata based on your estimated queue position.
 
-### Fee Model (Kalshi Oct 2025)
+**Example:**
+- You post a bid at 45¢, 100 contracts already resting
+- Your queue position: 100 (behind existing orders)
+- 50 contracts trade at 45¢
+- You get filled: 50 × (your_size / (100 + your_size))
 
-- **Taker fee**: 2% of potential payout
-- **Potential payout** = `min(price, 100-price)` per contract
-- Fees rounded up to nearest cent
-- No settlement fee
+This provides a conservative estimate of maker fills without requiring true L3 data.
 
-Example: Buy 10 contracts at 50¢
-- Potential payout = min(50, 50) = 50¢
-- Fee = ceil(50 × 10 × 0.02) = 10¢
+### Fee Model (Kalshi Official)
+
+Fees are based on Kalshi's official fee schedule:
+
+- **Taker fee**: `ceil(0.07 × contracts × P × (1-P) × 100)` cents
+- **Maker fee**: `ceil(0.0175 × contracts × P × (1-P) × 100)` cents
+
+Where `P` is the price as a decimal (e.g., 50¢ = 0.50).
+
+The formula `P × (1-P)` means:
+- Fees are highest at 50¢ (0.50 × 0.50 = 0.25)
+- Fees decrease toward extreme prices
+- At 10¢: 0.10 × 0.90 = 0.09 (36% of peak)
+- At 50¢: 0.50 × 0.50 = 0.25 (peak)
+
+**Examples:**
+
+Buy 1 contract at 50¢ (taker):
+- Fee = ceil(0.07 × 1 × 0.50 × 0.50 × 100) = ceil(1.75) = **2¢**
+
+Buy 1 contract at 50¢ (maker):
+- Fee = ceil(0.0175 × 1 × 0.50 × 0.50 × 100) = ceil(0.4375) = **1¢**
+
+Buy 10 contracts at 30¢ (taker):
+- Fee = ceil(0.07 × 10 × 0.30 × 0.70 × 100) = ceil(14.7) = **15¢**
 
 ### Mark-to-Market (Liquidation-based)
 
@@ -324,12 +410,11 @@ python scripts/convert_raw_data.py new_orderbook_data.csv --output-dir episodes/
 
 Update `settlement.json` with actual outcomes when available.
 
-## Future Extensions (v1+)
+## Future Extensions
 
-- **Maker orders**: Queue simulation using trades tape
-- **Trades data**: `trades.parquet` with actual trade prints
 - **More events**: Sports, politics, economics
 - **Multi-event episodes**: Concurrent trading across events
+- **L3 data**: True queue position from order-by-order data
 
 ## Development
 

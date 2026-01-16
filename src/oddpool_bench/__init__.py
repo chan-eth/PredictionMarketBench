@@ -5,15 +5,17 @@ Replays real Kalshi episodes and evaluates agent trading performance under reali
 execution constraints.
 """
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 
 from .types import (
     Side,
     Action,
     OrderType,
     TimeInForce,
+    FillType,
     Order,
     Fill,
+    RestingOrder,
     OrderResult,
     Position,
     MarketInfo,
@@ -21,10 +23,15 @@ from .types import (
     OrderbookSnapshot,
     SettlementResult,
     EpisodeMetadata,
+    EquitySnapshot,
+    EpisodeResult,
 )
 from .agent import Agent, AgentContext
 from .simulator import Simulator, SimulatorConfig
 from .harness import BenchmarkHarness, BenchmarkResult
+from .fees import FeeModel, KalshiOct2025FeeModel, get_fee_model
+from .maker_queue import MakerQueueManager, LevelQueue
+from .data import TradePrint, load_trades_data
 
 __all__ = [
     # Types
@@ -32,8 +39,10 @@ __all__ = [
     "Action",
     "OrderType",
     "TimeInForce",
+    "FillType",
     "Order",
     "Fill",
+    "RestingOrder",
     "OrderResult",
     "Position",
     "MarketInfo",
@@ -41,6 +50,8 @@ __all__ = [
     "OrderbookSnapshot",
     "SettlementResult",
     "EpisodeMetadata",
+    "EquitySnapshot",
+    "EpisodeResult",
     # Core
     "Agent",
     "AgentContext",
@@ -48,4 +59,13 @@ __all__ = [
     "SimulatorConfig",
     "BenchmarkHarness",
     "BenchmarkResult",
+    # Fees
+    "FeeModel",
+    "KalshiOct2025FeeModel",
+    "get_fee_model",
+    # Maker
+    "MakerQueueManager",
+    "LevelQueue",
+    "TradePrint",
+    "load_trades_data",
 ]

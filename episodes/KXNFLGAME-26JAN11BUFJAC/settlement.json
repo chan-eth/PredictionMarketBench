@@ -1,0 +1,10 @@
+{
+  "KXNFLGAME-26JAN11BUFJAC-JAC": {
+    "result": "NO",
+    "settled_ts": "2026-01-11T21:07:29.169729+00:00"
+  },
+  "KXNFLGAME-26JAN11BUFJAC-BUF": {
+    "result": "YES",
+    "settled_ts": "2026-01-11T21:07:29.169729+00:00"
+  }
+}

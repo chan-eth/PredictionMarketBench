@@ -28,9 +28,16 @@ class OrderType(Enum):
 
 class TimeInForce(Enum):
     """Time in force for orders."""
-    IOC = "ioc"  # Immediate or cancel
-    GTC = "gtc"  # Good til canceled (not supported in v0 taker-only)
-    GTD = "gtd"  # Good til date (not supported in v0 taker-only)
+    IOC = "ioc"  # Immediate or cancel (taker only)
+    GTC = "gtc"  # Good til canceled (can rest as maker)
+    GTD = "gtd"  # Good til date (not supported yet)
+    POST_ONLY = "post_only"  # Must rest as maker, reject if would cross
+
+
+class FillType(Enum):
+    """Whether a fill was maker or taker."""
+    TAKER = "taker"
+    MAKER = "maker"
 
 
 @dataclass
@@ -124,12 +131,33 @@ class Order:
     count: int  # Number of contracts
     limit_price_cents: Optional[int] = None  # Required for limit orders
     time_in_force: TimeInForce = TimeInForce.IOC
+    order_id: Optional[str] = None  # Optional client order ID for tracking
     
     def __post_init__(self):
         if self.order_type == OrderType.LIMIT and self.limit_price_cents is None:
             raise ValueError("Limit orders require limit_price_cents")
         if self.count <= 0:
             raise ValueError("Order count must be positive")
+    
+    def to_canonical_bid(self) -> tuple[Side, int]:
+        """
+        Convert order to canonical bid representation.
+        
+        Returns (contract_side, price_cents) where we're placing a bid
+        on contract_side at price_cents.
+        
+        Mapping:
+        - Buy YES @ p → YES bid @ p
+        - Sell YES @ p → NO bid @ (100-p)
+        - Buy NO @ p → NO bid @ p  
+        - Sell NO @ p → YES bid @ (100-p)
+        """
+        if self.action == Action.BUY:
+            return (self.side, self.limit_price_cents)
+        else:
+            # Selling = bidding on opposite side at flipped price
+            opposite = Side.NO if self.side == Side.YES else Side.YES
+            return (opposite, 100 - self.limit_price_cents)
 
 
 @dataclass
@@ -138,6 +166,21 @@ class Fill:
     price_cents: int
     size: int
     fee_cents: int
+    fill_type: FillType = FillType.TAKER  # Taker or maker
+    fill_ts: Optional[datetime] = None  # When fill occurred (for maker fills)
+
+
+@dataclass
+class RestingOrder:
+    """A resting (maker) order in the queue."""
+    order_id: str
+    original_order: Order
+    contract_side: Side  # Canonical: YES or NO bid
+    price_cents: int  # Canonical bid price
+    remaining_count: int
+    placed_ts: datetime
+    env_ahead: int  # Environment size ahead when placed
+    fills: list[Fill] = field(default_factory=list)
 
 
 @dataclass
@@ -151,6 +194,7 @@ class OrderResult:
     total_fees_cents: int
     rejected: bool = False
     reject_reason: Optional[str] = None
+    resting_order: Optional[RestingOrder] = None  # For GTC orders that rest
     
     @property
     def average_fill_price(self) -> Optional[float]:
@@ -203,9 +247,10 @@ class EpisodeMetadata:
     end_ts: datetime
     initial_bankroll_cents: int
     fee_model_version: str
-    execution_mode: str  # "taker_only" for v0
-    observation_depth: int  # Number of orderbook levels provided
+    execution_mode: str  # "taker_only", "maker_taker"
+    observation_depth: int  # Number of orderbook levels (-1 = full depth)
     description: Optional[str] = None
+    has_trades_tape: bool = False  # Whether trade data is available for maker fills
     
     @classmethod
     def from_dict(cls, d: dict) -> "EpisodeMetadata":
@@ -221,6 +266,7 @@ class EpisodeMetadata:
             execution_mode=d["execution_mode"],
             observation_depth=d["observation_depth"],
             description=d.get("description"),
+            has_trades_tape=d.get("has_trades_tape", False),
         )
     
     def to_dict(self) -> dict:
@@ -236,6 +282,7 @@ class EpisodeMetadata:
             "execution_mode": self.execution_mode,
             "observation_depth": self.observation_depth,
             "description": self.description,
+            "has_trades_tape": self.has_trades_tape,
         }
 
 

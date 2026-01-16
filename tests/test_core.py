@@ -91,32 +91,36 @@ class TestOrderbookSnapshot:
 
 
 class TestKalshiFeeModel:
-    """Tests for the Kalshi fee model."""
+    """Tests for the Kalshi fee model.
+    
+    Fee formula from Kalshi docs:
+        Taker: fee = ceil(0.07 × C × P × (1-P))  
+        Maker: fee = ceil(0.0175 × C × P × (1-P))
+    
+    Where P = price in dollars (50 cents = 0.50)
+    """
     
     def test_taker_fee_at_50(self):
-        """Taker fee at 50 cents (maximum potential payout)."""
+        """Taker fee at 50 cents (maximum fee point)."""
         fee_model = KalshiOct2025FeeModel()
         
-        # At 50 cents, potential payout = min(50, 50) = 50
-        # Fee = ceil(50 * 1 * 0.02) = ceil(1.0) = 1
+        # At P=0.50, C=1: ceil(0.07 × 1 × 0.50 × 0.50 × 100) = ceil(1.75) = 2
         fee = fee_model.calculate_taker_fee(price_cents=50, count=1)
-        assert fee == 1
+        assert fee == 2
         
-        # 10 contracts
-        # Fee = ceil(50 * 10 * 0.02) = ceil(10) = 10
+        # 10 contracts: ceil(0.07 × 10 × 0.50 × 0.50 × 100) = ceil(17.5) = 18
         fee = fee_model.calculate_taker_fee(price_cents=50, count=10)
-        assert fee == 10
+        assert fee == 18
     
     def test_taker_fee_at_extreme_prices(self):
-        """Taker fee at extreme prices (low potential payout)."""
+        """Taker fee at extreme prices (lower fee due to P×(1-P) formula)."""
         fee_model = KalshiOct2025FeeModel()
         
-        # At 5 cents, potential payout = min(5, 95) = 5
-        # Fee = ceil(5 * 1 * 0.02) = ceil(0.1) = 1 (rounds up)
+        # At P=0.05, C=1: ceil(0.07 × 1 × 0.05 × 0.95 × 100) = ceil(0.3325) = 1
         fee = fee_model.calculate_taker_fee(price_cents=5, count=1)
         assert fee == 1
         
-        # At 95 cents, same calculation
+        # At P=0.95, C=1: ceil(0.07 × 1 × 0.95 × 0.05 × 100) = ceil(0.3325) = 1
         fee = fee_model.calculate_taker_fee(price_cents=95, count=1)
         assert fee == 1
     
@@ -124,10 +128,21 @@ class TestKalshiFeeModel:
         """Fee should always round up to nearest cent."""
         fee_model = KalshiOct2025FeeModel()
         
-        # At 30 cents, potential payout = 30
-        # Fee = ceil(30 * 1 * 0.02) = ceil(0.6) = 1
+        # At P=0.30, C=1: ceil(0.07 × 1 × 0.30 × 0.70 × 100) = ceil(1.47) = 2
         fee = fee_model.calculate_taker_fee(price_cents=30, count=1)
-        assert fee == 1
+        assert fee == 2
+    
+    def test_maker_fee_is_quarter_of_taker(self):
+        """Maker fee is 1/4 of taker fee (0.0175 vs 0.07)."""
+        fee_model = KalshiOct2025FeeModel()
+        
+        # At P=0.50, C=10: maker = ceil(0.0175 × 10 × 0.50 × 0.50 × 100) = ceil(4.375) = 5
+        maker_fee = fee_model.calculate_maker_fee(price_cents=50, count=10)
+        assert maker_fee == 5
+        
+        # Taker fee at same price/count is 18, maker is ~4x less
+        taker_fee = fee_model.calculate_taker_fee(price_cents=50, count=10)
+        assert taker_fee == 18
 
 
 class TestExecutionEngine:
