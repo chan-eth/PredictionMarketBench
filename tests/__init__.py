@@ -1,0 +1,1 @@
+"""Oddpool PredictionMarketBench test suite."""

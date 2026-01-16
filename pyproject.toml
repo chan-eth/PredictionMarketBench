@@ -1,0 +1,86 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "oddpool-prediction-market-bench"
+version = "0.1.0"
+description = "A benchmark for evaluating prediction market trading agents using Kalshi replay data"
+readme = "README.md"
+license = {text = "MIT"}
+requires-python = ">=3.10"
+authors = [
+    {name = "Oddpool", email = "bench@oddpool.io"}
+]
+keywords = [
+    "prediction-markets",
+    "kalshi",
+    "trading",
+    "benchmark",
+    "reinforcement-learning",
+    "agent",
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+
+dependencies = []
+
+[project.optional-dependencies]
+parquet = ["pyarrow>=14.0.0"]
+plotting = ["matplotlib>=3.7.0"]
+dev = [
+    "pytest>=7.0",
+    "pytest-cov>=4.0",
+    "black>=23.0",
+    "ruff>=0.1.0",
+    "mypy>=1.0",
+]
+all = [
+    "oddpool-prediction-market-bench[parquet,plotting,dev]",
+]
+
+[project.urls]
+Homepage = "https://github.com/FirmTracker/PredictionMarketBench"
+Repository = "https://github.com/FirmTracker/PredictionMarketBench"
+Documentation = "https://github.com/FirmTracker/PredictionMarketBench#readme"
+
+[project.scripts]
+oddpool-bench = "oddpool_bench.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+oddpool_bench = ["py.typed"]
+
+[tool.black]
+line-length = 100
+target-version = ["py310", "py311", "py312"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "W"]
+ignore = ["E501"]
+
+[tool.mypy]
+python_version = "3.10"
+warn_return_any = true
+warn_unused_ignores = true
+disallow_untyped_defs = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_functions = ["test_*"]
