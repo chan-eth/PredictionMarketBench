@@ -52,15 +52,22 @@ def compute_sharpe_ratio(
     risk_free_rate: float = 0.0,
 ) -> Optional[float]:
     """
-    Compute Sharpe ratio from equity curve.
+    Compute annualized Sharpe ratio from equity curve.
+    
+    Uses the standard formula: Sharpe = (E[R] - Rf) / σ(R) * √(N)
+    where:
+    - E[R] is the mean return per period
+    - Rf is the risk-free rate per period
+    - σ(R) is the standard deviation of returns (sample std, using n-1)
+    - N is the number of periods per year (for annualization)
     
     Args:
         equity_curve: List of equity snapshots
-        sampling_interval_seconds: Interval for computing returns (default 1 min)
+        sampling_interval_seconds: Interval for computing returns (default 60s)
         risk_free_rate: Annualized risk-free rate (default 0)
         
     Returns:
-        Sharpe ratio, or None if insufficient data
+        Annualized Sharpe ratio, or None if insufficient data
     """
     if len(equity_curve) < 2:
         return None
@@ -77,10 +84,10 @@ def compute_sharpe_ratio(
             sampled.append(snap.equity_cents)
             last_ts = snap.ts
     
-    if len(sampled) < 2:
+    if len(sampled) < 3:  # Need at least 3 points for meaningful stats
         return None
     
-    # Compute returns
+    # Compute returns (percentage change between periods)
     returns = []
     for i in range(1, len(sampled)):
         if sampled[i - 1] > 0:
@@ -90,22 +97,29 @@ def compute_sharpe_ratio(
     if len(returns) < 2:
         return None
     
-    # Compute mean and std
-    mean_return = sum(returns) / len(returns)
-    variance = sum((r - mean_return) ** 2 for r in returns) / len(returns)
+    n = len(returns)
+    
+    # Compute mean return
+    mean_return = sum(returns) / n
+    
+    # Compute sample standard deviation (using n-1 for unbiased estimator)
+    variance = sum((r - mean_return) ** 2 for r in returns) / (n - 1)
     std_return = math.sqrt(variance) if variance > 0 else 0
     
     if std_return == 0:
+        # No volatility - can't compute meaningful Sharpe
         return None
     
-    # Annualize (assuming returns are per interval)
+    # Annualization factor
     # Intervals per year ≈ seconds_per_year / sampling_interval
-    intervals_per_year = 365 * 24 * 3600 / sampling_interval_seconds
+    seconds_per_year = 365.25 * 24 * 3600
+    intervals_per_year = seconds_per_year / sampling_interval_seconds
     
-    # Per-interval risk-free rate
+    # Convert annual risk-free rate to per-interval rate
     rf_per_interval = risk_free_rate / intervals_per_year
     
-    # Sharpe = (mean - rf) / std * sqrt(intervals_per_year)
+    # Sharpe ratio: (mean_return - rf) / std * sqrt(intervals_per_year)
+    # This annualizes the ratio by multiplying by sqrt of periods per year
     sharpe = (mean_return - rf_per_interval) / std_return * math.sqrt(intervals_per_year)
     
     return sharpe

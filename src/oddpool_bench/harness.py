@@ -213,7 +213,249 @@ class BenchmarkResult:
         plt.close()
         
         print(f"Saved equity curve to {path}")
+
+    def save_equity_gif(
+        self,
+        path: Path,
+        episode_id: str = None,
+        figsize: tuple[int, int] = (10, 6),
+        fps: int = 15,
+        duration_seconds: float = 8.0,
+    ) -> None:
+        """
+        Save animated GIF of PnL over time for social media sharing.
+        
+        Creates an animation that shows the equity curve building up over time,
+        perfect for sharing trading bot performance on social media.
+        
+        Args:
+            path: Output path (should end in .gif). If episode_id is None and
+                  multiple episodes exist, will append episode_id to filename.
+            episode_id: Specific episode to animate. If None and only one episode,
+                       uses that one. If None and multiple episodes, creates 
+                       separate GIFs for each.
+            figsize: Figure size in inches (width, height)
+            fps: Frames per second for the animation
+            duration_seconds: Total duration of the GIF
+        
+        Requires: pip install matplotlib pillow
+        """
+        try:
+            import matplotlib.pyplot as plt
+            import matplotlib.dates as mdates
+            from matplotlib.animation import FuncAnimation, PillowWriter
+        except ImportError:
+            raise ImportError(
+                "matplotlib and pillow are required. Install with: pip install matplotlib pillow"
+            )
+        
+        path = Path(path)
+        
+        # If path is a directory, construct filenames
+        if path.is_dir() or not path.suffix:
+            path.mkdir(parents=True, exist_ok=True)
+            base_dir = path
+            use_directory = True
+        else:
+            # path is a file, extract directory
+            base_dir = path.parent
+            base_dir.mkdir(parents=True, exist_ok=True)
+            use_directory = False
+        
+        # Determine which episodes to animate
+        if episode_id is not None:
+            # Find specific episode
+            episodes_to_animate = [
+                ep for ep in self.episode_results if ep.episode_id == episode_id
+            ]
+            if not episodes_to_animate:
+                raise ValueError(f"Episode not found: {episode_id}")
+        else:
+            episodes_to_animate = self.episode_results
+        
+        # Generate GIF for each episode
+        for ep_idx, episode in enumerate(episodes_to_animate):
+            # Determine output path
+            if use_directory:
+                # Directory was passed - create filenames for each episode
+                ep_path = base_dir / f"pnl_animation_{episode.episode_id}.gif"
+            elif len(episodes_to_animate) > 1:
+                # Multiple episodes - add episode ID to filename
+                stem = path.stem
+                suffix = path.suffix or ".gif"
+                ep_path = path.parent / f"{stem}_{episode.episode_id}{suffix}"
+            else:
+                ep_path = path
+            
+            self._save_single_episode_gif(
+                episode=episode,
+                path=ep_path,
+                figsize=figsize,
+                fps=fps,
+                duration_seconds=duration_seconds,
+            )
     
+    def _save_single_episode_gif(
+        self,
+        episode,
+        path: Path,
+        figsize: tuple[int, int],
+        fps: int,
+        duration_seconds: float,
+    ) -> None:
+        """Generate animated GIF for a single episode."""
+        import matplotlib.pyplot as plt
+        import matplotlib.dates as mdates
+        from matplotlib.animation import FuncAnimation, PillowWriter
+        from datetime import timedelta
+        
+        # Extract equity data
+        initial = episode.initial_equity_cents
+        times = [snap.ts for snap in episode.equity_curve]
+        pnls = [(snap.equity_cents - initial) / 100 for snap in episode.equity_curve]
+        
+        if not times:
+            print(f"No equity data for episode {episode.episode_id}")
+            return
+        
+        # Determine number of frames
+        n_frames = int(fps * duration_seconds)
+        n_points = len(times)
+        
+        # Convert times to numeric for interpolation
+        start_time = times[0]
+        end_time = times[-1]
+        total_duration = (end_time - start_time).total_seconds()
+        
+        # Convert to seconds from start for interpolation
+        times_numeric = [(t - start_time).total_seconds() for t in times]
+        
+        # Pre-compute interpolated data for each frame
+        # Animation progresses smoothly through time, with line extending to current time
+        frame_data = []
+        for frame in range(n_frames):
+            progress = (frame + 1) / n_frames
+            current_time_sec = progress * total_duration
+            
+            # Find all data points up to current time, plus interpolate to current position
+            x_vals = []
+            y_vals = []
+            
+            for i, t_sec in enumerate(times_numeric):
+                if t_sec <= current_time_sec:
+                    x_vals.append(times[i])
+                    y_vals.append(pnls[i])
+                else:
+                    break
+            
+            # If we're between data points, extend line to current time position
+            # with the last known PnL value (step interpolation - PnL doesn't change
+            # until there's a new trade)
+            if x_vals and current_time_sec > times_numeric[len(x_vals) - 1]:
+                # Add current position with last known PnL
+                current_datetime = start_time + timedelta(seconds=current_time_sec)
+                x_vals.append(current_datetime)
+                y_vals.append(y_vals[-1] if y_vals else 0)
+            
+            frame_data.append((x_vals, y_vals))
+        
+        # Setup figure with dark theme for social media
+        plt.style.use('dark_background')
+        fig, ax = plt.subplots(figsize=figsize, facecolor='#1a1a2e')
+        ax.set_facecolor('#1a1a2e')
+        
+        # Style settings
+        positive_color = '#00ff88'
+        negative_color = '#ff4444'
+        
+        # Determine line color based on final PnL
+        final_pnl = pnls[-1] if pnls else 0
+        line_color = positive_color if final_pnl >= 0 else negative_color
+        
+        # Initialize plot elements
+        line, = ax.plot([], [], color=line_color, linewidth=2.5, alpha=0.9)
+        fill_collection = None
+        
+        # Set axis limits with padding
+        y_min = min(pnls) if pnls else -1
+        y_max = max(pnls) if pnls else 1
+        y_range = max(abs(y_min), abs(y_max), 0.5)
+        ax.set_xlim(times[0], times[-1])
+        ax.set_ylim(-y_range * 1.2, y_range * 1.2)
+        
+        # Zero line
+        ax.axhline(y=0, color='white', linestyle='--', linewidth=0.8, alpha=0.5)
+        
+        # Formatting
+        ax.set_ylabel('PnL ($)', fontsize=12, color='white')
+        ax.set_xlabel('Time', fontsize=12, color='white')
+        ax.xaxis.set_major_formatter(mdates.DateFormatter('%H:%M'))
+        ax.tick_params(colors='white')
+        ax.grid(True, alpha=0.2, color='white')
+        
+        # Title with episode name
+        episode_short = episode.episode_id[:20] + "..." if len(episode.episode_id) > 20 else episode.episode_id
+        title = ax.set_title(f'{episode_short}\nPnL: $0.00', fontsize=14, fontweight='bold', 
+                            color='white', pad=10)
+        
+        # Add watermarks - oddpool.com on left, PredictionMarketBench on right
+        fig.text(0.02, 0.02, 'oddpool.com', fontsize=9, 
+                color='white', alpha=0.5, ha='left', va='bottom')
+        fig.text(0.98, 0.02, 'PredictionMarketBench', fontsize=9, 
+                color='white', alpha=0.5, ha='right', va='bottom')
+        
+        def init():
+            line.set_data([], [])
+            return line,
+        
+        def animate(frame):
+            nonlocal fill_collection
+            
+            # Get pre-computed data for this frame
+            x_data, y_data = frame_data[frame]
+            
+            if not x_data:
+                return line,
+            
+            # Update line
+            line.set_data(x_data, y_data)
+            
+            # Update fill (green for profit, red for loss)
+            if fill_collection is not None:
+                fill_collection.remove()
+            
+            current_pnl = y_data[-1] if y_data else 0
+            fill_color = positive_color if current_pnl >= 0 else negative_color
+            fill_collection = ax.fill_between(x_data, 0, y_data, alpha=0.3, color=fill_color)
+            
+            # Update line color based on current PnL
+            line.set_color(fill_color)
+            
+            # Update title with current PnL
+            title.set_text(f'{episode_short}\nPnL: ${current_pnl:+.2f}')
+            title.set_color(fill_color)
+            
+            return line, fill_collection
+        
+        # Create animation
+        anim = FuncAnimation(
+            fig, animate, init_func=init,
+            frames=n_frames, interval=1000/fps, blit=False
+        )
+        
+        # Save as GIF
+        writer = PillowWriter(fps=fps)
+        anim.save(path, writer=writer, dpi=100)
+        plt.close()
+        
+        # Reset style
+        plt.style.use('default')
+        
+        print(f"Saved animated PnL GIF to {path}")
+        print(f"  Episode: {episode.episode_id}")
+        print(f"  Duration: {duration_seconds}s at {fps} fps ({n_frames} frames)")
+        print(f"  Final PnL: ${final_pnl:+.2f}")
+
     def save_equity_csv(self, path: Path) -> None:
         """
         Save equity curve data to CSV file.

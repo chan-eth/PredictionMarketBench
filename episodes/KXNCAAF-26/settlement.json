@@ -1,0 +1,10 @@
+{
+  "KXNCAAF-26-MIA": {
+    "result": "NO",
+    "settled_ts": "2026-01-20T04:18:25.253040+00:00"
+  },
+  "KXNCAAF-26-IND": {
+    "result": "YES",
+    "settled_ts": "2026-01-20T04:18:25.253040+00:00"
+  }
+}

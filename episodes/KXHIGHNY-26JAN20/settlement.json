@@ -1,0 +1,26 @@
+{
+  "KXHIGHNY-26JAN20-T29": {
+    "result": "NO",
+    "settled_ts": "2026-01-21T04:59:00+00:00"
+  },
+  "KXHIGHNY-26JAN20-T22": {
+    "result": "NO",
+    "settled_ts": "2026-01-21T04:59:00+00:00"
+  },
+  "KXHIGHNY-26JAN20-B28.5": {
+    "result": "NO",
+    "settled_ts": "2026-01-21T04:59:00+00:00"
+  },
+  "KXHIGHNY-26JAN20-B26.5": {
+    "result": "YES",
+    "settled_ts": "2026-01-21T04:59:00+00:00"
+  },
+  "KXHIGHNY-26JAN20-B24.5": {
+    "result": "NO",
+    "settled_ts": "2026-01-21T04:59:00+00:00"
+  },
+  "KXHIGHNY-26JAN20-B22.5": {
+    "result": "NO",
+    "settled_ts": "2026-01-21T04:59:00+00:00"
+  }
+}
