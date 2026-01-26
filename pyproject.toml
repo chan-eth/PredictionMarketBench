@@ -51,8 +51,8 @@ all = [
 
 [project.urls]
 Homepage = "https://oddpool.com"
-Repository = "https://github.com/FirmTracker/PredictionMarketBench"
-Documentation = "https://github.com/FirmTracker/PredictionMarketBench#readme"
+Repository = "https://github.com/Oddpool/PredictionMarketBench"
+Documentation = "https://github.com/Oddpool/PredictionMarketBench#readme"
 
 [tool.setuptools.packages.find]
 where = ["src"]

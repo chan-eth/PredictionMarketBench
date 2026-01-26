@@ -13,7 +13,7 @@ PredictionMarketBench replays real Kalshi episodes and evaluates trading agent p
 ## Installation
 
 ```bash
-git clone https://github.com/FirmTracker/PredictionMarketBench.git
+git clone https://github.com/Oddpool/PredictionMarketBench.git
 cd PredictionMarketBench
 
 # Install in development mode
@@ -220,5 +220,5 @@ MIT
 
 ## Links
 
-- Repository: https://github.com/FirmTracker/PredictionMarketBench
+- Repository: https://github.com/Oddpool/PredictionMarketBench
 - Oddpool: https://oddpool.com
