@@ -1,0 +1,26 @@
+{
+  "KXHIGHNY-26MAR16-B57.5": {
+    "result": "NO",
+    "settled_ts": "2026-03-15T23:13:56.136984+00:00"
+  },
+  "KXHIGHNY-26MAR16-B59.5": {
+    "result": "NO",
+    "settled_ts": "2026-03-15T23:13:56.137007+00:00"
+  },
+  "KXHIGHNY-26MAR16-B61.5": {
+    "result": "NO",
+    "settled_ts": "2026-03-15T23:13:56.137012+00:00"
+  },
+  "KXHIGHNY-26MAR16-B63.5": {
+    "result": "NO",
+    "settled_ts": "2026-03-15T23:13:56.137016+00:00"
+  },
+  "KXHIGHNY-26MAR16-T57": {
+    "result": "NO",
+    "settled_ts": "2026-03-15T23:13:56.137019+00:00"
+  },
+  "KXHIGHNY-26MAR16-T64": {
+    "result": "NO",
+    "settled_ts": "2026-03-15T23:13:56.137023+00:00"
+  }
+}
