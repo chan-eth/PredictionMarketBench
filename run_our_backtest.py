@@ -16,6 +16,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 
 from oddpool_bench import BenchmarkHarness, SimulatorConfig
 from our_agents import PremiumHarvester, MomentumSniper, CombinedAgent
+from scaled_harvester import ScaledHarvesterV2
 from examples.example_agents import PassiveAgent, RandomAgent
 
 def main():
@@ -46,10 +47,11 @@ def main():
             max_position_per_market=10,
             max_total_positions=20,
         ),
+        "ScaledHarvesterV2": ScaledHarvesterV2(),
         "MomentumSniper": MomentumSniper(
             lookback=15,
             entry_threshold_cents=3,
-            exit_threshold_cents=2,
+            profit_target_cents=2,
             max_position=5,
         ),
         "Combined": CombinedAgent(),
@@ -80,16 +82,14 @@ def main():
     print(f"\n{'='*60}")
     print("  STRATEGY COMPARISON")
     print(f"{'='*60}")
-    print(f"{'Strategy':<25} {'PnL':>10} {'Trades':>8} {'Win%':>8} {'Sharpe':>8}")
+    print(f"{'Strategy':<25} {'PnL':>10} {'Contracts':>10} {'Sharpe':>8}")
     print("-" * 60)
     for name, result in results.items():
-        summary = result.get_summary()
-        pnl = summary.get("total_pnl_cents", 0) / 100.0
-        trades = summary.get("total_trades", 0)
-        wins = summary.get("winning_trades", 0)
-        win_pct = (wins / trades * 100) if trades > 0 else 0
-        sharpe = summary.get("sharpe_ratio", 0)
-        print(f"{name:<25} ${pnl:>8.2f} {trades:>8} {win_pct:>7.1f}% {sharpe:>7.2f}")
+        pnl = sum(r.total_pnl_cents for r in result.episode_results) / 100.0
+        contracts = sum(r.total_contracts_traded for r in result.episode_results)
+        sharpe_vals = [r.sharpe_ratio for r in result.episode_results if r.sharpe_ratio is not None]
+        sharpe = sum(sharpe_vals) / len(sharpe_vals) if sharpe_vals else 0.0
+        print(f"{name:<25} ${pnl:>8.2f} {contracts:>10} {sharpe:>7.2f}")
 
 
 if __name__ == "__main__":

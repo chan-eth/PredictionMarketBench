@@ -155,8 +155,10 @@ class PremiumHarvester(Agent):
                 count=contracts,
             )
             result = ctx.place_order(order)
-            if result and result.get("filled", 0) > 0:
-                self.positions[ticker] = result["filled"]
+            if result and not result.get("rejected"):
+                fill_info = result.get("fill")
+                if fill_info and fill_info["count"] > 0:
+                    self.positions[ticker] = fill_info["count"]
 
 
 class PremiumHarvesterKelly(Agent):
@@ -246,8 +248,10 @@ class PremiumHarvesterKelly(Agent):
                 count=contracts,
             )
             result = ctx.place_order(order)
-            if result and result.get("filled", 0) > 0:
-                self.positions[ticker] = result["filled"]
+            if result and not result.get("rejected"):
+                fill_info = result.get("fill")
+                if fill_info and fill_info["count"] > 0:
+                    self.positions[ticker] = fill_info["count"]
 
 
 class MomentumSniper(Agent):
@@ -431,12 +435,14 @@ class MomentumSniper(Agent):
                         count=contracts,
                     )
                     result = ctx.place_order(order)
-                    if result and result.get("filled", 0) > 0:
-                        self.positions[ticker] = {
-                            "side": "yes",
-                            "entry_price": mid,
-                            "contracts": result["filled"],
-                        }
+                    if result and not result.get("rejected"):
+                        fill_info = result.get("fill")
+                        if fill_info and fill_info["count"] > 0:
+                            self.positions[ticker] = {
+                                "side": "yes",
+                                "entry_price": mid,
+                                "contracts": fill_info["count"],
+                            }
         else:
             # Downward momentum → buy NO
             no_ask = 100 - market.yes_best_bid if market.yes_best_bid else None
@@ -451,12 +457,14 @@ class MomentumSniper(Agent):
                         count=contracts,
                     )
                     result = ctx.place_order(order)
-                    if result and result.get("filled", 0) > 0:
-                        self.positions[ticker] = {
-                            "side": "no",
-                            "entry_price": mid,
-                            "contracts": result["filled"],
-                        }
+                    if result and not result.get("rejected"):
+                        fill_info = result.get("fill")
+                        if fill_info and fill_info["count"] > 0:
+                            self.positions[ticker] = {
+                                "side": "no",
+                                "entry_price": mid,
+                                "contracts": fill_info["count"],
+                            }
 
 
 class CombinedAgent(Agent):
